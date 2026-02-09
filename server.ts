@@ -6,6 +6,8 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config();
 const app = express();
@@ -599,7 +601,51 @@ app.post('/api/reviews', async (req, res) => {
         res.json({ success: true });
     } catch { res.status(500).json({ error: "Review error" }); }
 });
+// === SEO & SOCIAL MEDIA INJECTION ===
+app.get('/hero/:id', async (req, res) => {
+    try {
+        const heroId = req.params.id;
+        
+        // Căutăm index.html. Încercăm două locații posibile (root sau lângă script)
+        let indexPath = path.join(__dirname, '../index.html');
+        if (!fs.existsSync(indexPath)) {
+            indexPath = path.join(__dirname, 'index.html');
+        }
 
+        if (!fs.existsSync(indexPath)) {
+             return res.status(404).send('Eroare: index.html lipsă pe server.');
+        }
+
+        const hero = await prisma.hero.findUnique({ where: { id: heroId } });
+        let html = fs.readFileSync(indexPath, 'utf8');
+
+        if (hero) {
+            // Completăm datele pentru WhatsApp
+            const title = `${hero.alias} - ${hero.category} | Superfix`;
+            const desc = `Ai nevoie de un ${hero.category}? ${hero.alias} te poate ajuta! Tarif: ${hero.hourlyRate} RON/h.`;
+            // Dacă poza nu începe cu http, îi punem domeniul în față
+            const image = hero.avatarUrl?.startsWith('http') 
+                ? hero.avatarUrl 
+                : `https://super-fix.ro${hero.avatarUrl || '/og-default.jpg'}`;
+
+            html = html
+                .replace(/__META_TITLE__/g, title)
+                .replace(/__META_DESCRIPTION__/g, desc)
+                .replace(/__META_IMAGE__/g, image);
+        } else {
+            // Fallback
+            html = html
+                .replace(/__META_TITLE__/g, 'Superfix - Găsește Meseriaș')
+                .replace(/__META_DESCRIPTION__/g, 'Platforma eroilor locali.')
+                .replace(/__META_IMAGE__/g, 'https://super-fix.ro/og-default.jpg');
+        }
+
+        res.send(html);
+    } catch (error) {
+        console.error('SEO Error:', error);
+        res.status(500).send('Server Error');
+    }
+});
 app.listen(PORT, () => {
     console.log(`🚀 Server Backend "SuperFix" rulează pe portul ${PORT}`);
 });
