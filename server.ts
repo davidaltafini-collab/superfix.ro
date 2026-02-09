@@ -41,7 +41,63 @@ const transporter = nodemailer.createTransport({
     secure: false,
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASSWORD },
 });
+// 🚀 SEO DINAMIC (DEBUG VERSION)
+// ==================================================
 
+// 1. RUTA SPECIALĂ PENTRU EROI
+app.get('/hero/:id', async (req, res) => {
+    const heroId = req.params.id;
+    console.log(`[SEO] --> A venit o cerere pentru eroul: ${heroId}`);
+
+    // Căutăm index.html (verificăm ambele locuri posibile)
+    let indexPath = path.join(__dirname, '../index.html');
+    if (!fs.existsSync(indexPath)) {
+        indexPath = path.join(__dirname, 'index.html');
+    }
+
+    // Dacă nu găsim fișierul fizic
+    if (!fs.existsSync(indexPath)) {
+        console.error('[SEO] EROARE: Nu găsesc index.html!');
+        return res.status(404).send('Eroare: index.html lipsă pe server (backend).');
+    }
+
+    try {
+        // Citim fișierul original
+        let html = fs.readFileSync(indexPath, 'utf8');
+        
+        // Căutăm eroul în DB
+        const hero = await prisma.hero.findUnique({ where: { id: heroId } });
+
+        if (hero) {
+            console.log(`[SEO] Erou găsit: ${hero.alias}. Facem înlocuirea...`);
+            
+            const title = `${hero.alias} - ${hero.category} | Superfix`;
+            const desc = `Ai nevoie de un ${hero.category}? ${hero.alias} te poate ajuta! Tarif: ${hero.hourlyRate} RON/h.`;
+            // Verificăm dacă poza e link complet sau nu
+            const image = hero.avatarUrl && hero.avatarUrl.startsWith('http') 
+                ? hero.avatarUrl 
+                : `https://super-fix.ro${hero.avatarUrl || '/og-default.jpg'}`;
+
+            // AICI E MAGIA: Folosim replace cu Regex global (/g)
+            html = html.replace(/__META_TITLE__/g, title);
+            html = html.replace(/__META_DESCRIPTION__/g, desc);
+            html = html.replace(/__META_IMAGE__/g, image);
+            
+        } else {
+            console.log(`[SEO] Eroul NU a fost găsit în DB. Punem datele default.`);
+            
+            html = html.replace(/__META_TITLE__/g, 'SUPERFIX - Meseriașul Tău');
+            html = html.replace(/__META_DESCRIPTION__/g, 'Găsește eroul local care te salvează!');
+            html = html.replace(/__META_IMAGE__/g, 'https://super-fix.ro/og-default.jpg');
+        }
+
+        // Trimitem HTML-ul modificat
+        res.send(html);
+
+    } catch (error) {
+        console.error('[SEO] CRASH:', error);
+        res.status(500).send('Server Error la SEO');
+    }
 // === SEO SITEMAP GENERATOR ===
 // === SEO SITEMAP GENERATOR ===
 app.get('/sitemap.xml', async (req, res) => {
@@ -601,51 +657,7 @@ app.post('/api/reviews', async (req, res) => {
         res.json({ success: true });
     } catch { res.status(500).json({ error: "Review error" }); }
 });
-// === SEO & SOCIAL MEDIA INJECTION ===
-app.get('/hero/:id', async (req, res) => {
-    try {
-        const heroId = req.params.id;
-        
-        // Căutăm index.html. Încercăm două locații posibile (root sau lângă script)
-        let indexPath = path.join(__dirname, '../index.html');
-        if (!fs.existsSync(indexPath)) {
-            indexPath = path.join(__dirname, 'index.html');
-        }
 
-        if (!fs.existsSync(indexPath)) {
-             return res.status(404).send('Eroare: index.html lipsă pe server.');
-        }
-
-        const hero = await prisma.hero.findUnique({ where: { id: heroId } });
-        let html = fs.readFileSync(indexPath, 'utf8');
-
-        if (hero) {
-            // Completăm datele pentru WhatsApp
-            const title = `${hero.alias} - ${hero.category} | Superfix`;
-            const desc = `Ai nevoie de un ${hero.category}? ${hero.alias} te poate ajuta! Tarif: ${hero.hourlyRate} RON/h.`;
-            // Dacă poza nu începe cu http, îi punem domeniul în față
-            const image = hero.avatarUrl?.startsWith('http') 
-                ? hero.avatarUrl 
-                : `https://super-fix.ro${hero.avatarUrl || '/og-default.jpg'}`;
-
-            html = html
-                .replace(/__META_TITLE__/g, title)
-                .replace(/__META_DESCRIPTION__/g, desc)
-                .replace(/__META_IMAGE__/g, image);
-        } else {
-            // Fallback
-            html = html
-                .replace(/__META_TITLE__/g, 'Superfix - Găsește Meseriaș')
-                .replace(/__META_DESCRIPTION__/g, 'Platforma eroilor locali.')
-                .replace(/__META_IMAGE__/g, 'https://super-fix.ro/og-default.jpg');
-        }
-
-        res.send(html);
-    } catch (error) {
-        console.error('SEO Error:', error);
-        res.status(500).send('Server Error');
-    }
-});
 app.listen(PORT, () => {
     console.log(`🚀 Server Backend "SuperFix" rulează pe portul ${PORT}`);
 });
