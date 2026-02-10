@@ -373,9 +373,25 @@ app.delete('/api/admin/applications/:id', authenticateToken, async (req, res) =>
             where: { id: appId }
         });
         if (application) {
-            // 2. Trimitem email de respingere
-            await sendEmail(application.email, "STATUS APLICAȚIE", "DOSAR RESPINS", `Salut ${application.name}, mulțumim pentru interesul acordat Ligii Superfix. Din păcate, în acest moment profilul tău nu corespunde cu nevoile noastre operative sau locurile sunt ocupate.`, { "Status": "RESPINS (REJECTED)", "Motiv": "Selecție competitivă" }, `${process.env.FRONTEND_URL}/`, "ÎNAPOI LA SITE");
-            // 3. Ștergem aplicația din baza de date
+            // FIX: Verificăm dacă a devenit deja EROU (adică a fost acceptat).
+            // Dacă găsim un erou cu acest email, înseamnă că NU trebuie să trimitem mail de respingere.
+            const isAccepted = await prisma.hero.findFirst({
+                where: { email: application.email }
+            });
+
+            if (!isAccepted) {
+                // Trimitem email de respingere DOAR dacă nu a fost acceptat
+                await sendEmail(
+                    application.email,
+                    "STATUS APLICAȚIE",
+                    "DOSAR RESPINS",
+                    `Salut ${application.name}, mulțumim pentru interesul acordat Ligii Superfix. Din păcate, în acest moment profilul tău nu corespunde cu nevoile noastre operative sau locurile sunt ocupate.`,
+                    { "Status": "RESPINS (REJECTED)", "Motiv": "Selecție competitivă" },
+                    `${process.env.FRONTEND_URL}/`, "ÎNAPOI LA SITE"
+                );
+            }
+
+            // 3. Ștergem aplicația din baza de date (oricum trebuie ștearsă din listă)
             await prisma.heroApplication.delete({ where: { id: appId } });
         }
         res.json({ success: true });
