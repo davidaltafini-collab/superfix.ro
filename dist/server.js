@@ -38,7 +38,7 @@ const transporter = nodemailer.createTransport({
 // === SEO SITEMAP GENERATOR ===
 app.get('/sitemap.xml', async (req, res) => {
     try {
-        const baseUrl = process.env.FRONTEND_URL || 'https://superfix.ro';
+        const baseUrl = process.env.FRONTEND_URL || 'https://super-fix.ro';
         // 1. Luăm toți eroii din DB (DOAR ID-ul, fără updatedAt)
         const heroes = await prisma.hero.findMany({
             select: { id: true }
