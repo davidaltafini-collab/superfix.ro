@@ -683,6 +683,19 @@ app.post('/api/admin/approve-update/:updateId', authenticateToken, async (req, r
         res.status(500).json({ error: "Eroare la auto-replace" });
     }
 });
+// 4. ADMIN REJECT/CANCEL UPDATE
+app.delete('/api/admin/reject-update/:updateId', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'ADMIN') return res.status(403).json({ error: "Forbidden" });
+
+    try {
+        const updateId = req.params.updateId;
+        await prisma.heroUpdate.delete({ where: { id: updateId } });
+        res.json({ success: true, message: "Modificare anulată cu succes." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Eroare la ștergerea modificării." });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`🚀 Server Backend "SuperFix" rulează pe portul ${PORT}`);
