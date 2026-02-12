@@ -407,38 +407,46 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
         const existing = await prisma.hero.findUnique({ where: { username } });
         if (existing)
             return res.status(400).json({ error: "Username luat!" });
+
         const plainPassword = password || "Hero123!";
         const passwordHash = await bcrypt.hash(plainPassword, 10);
         const trustFactor = rest.trustFactor || 50;
+
         await prisma.hero.create({
             data: { username, alias, passwordHash, email, trustFactor, missionsCompleted: 0, ...rest }
         });
+
         if (email) {
-            await sendEmail(email, "BINE AI VENIT!", "DOSAR APROBAT", `Salut ${alias}, ai fost recrutat oficial! Cu o putere mare vine și o responsabilitate mare (și facturi plătite la timp).`, { "User": username, "Parola": plainPassword }, `${process.env.FRONTEND_URL}/portal`, "ACCESEAZĂ PORTALUL");
-        // --- EMAILUL NR. 2: INSTRUCȚIUNI ȘI COLECTARE DATE ---
+            // Email 1
+            await sendEmail(
+                email,
+                "BINE AI VENIT!",
+                "DOSAR APROBAT",
+                "Salut " + alias + ", ai fost recrutat oficial! Cu o putere mare vine și o responsabilitate mare.",
+                { "User": username, "Parola": plainPassword },
+                (process.env.FRONTEND_URL || "") + "/portal",
+                "ACCESEAZĂ PORTALUL"
+            );
+
+            // Email 2 - CORECTAT: am schimbat name cu alias
             await sendEmail(
                 email,
                 "PASUL 2: ACTIVAREA PROFILULUI TĂU",
-                "BINE AI VENIT ÎN LIGĂ! VEZI VIDEO DE INROLARE",
-                `Salut ${name}, acum că ai contul creat, trebuie să ne trimiți detaliile pentru a-ți publica profilul pe site. 
-                \n\nTe rugăm să urmărești videoclipul de înrolare aici: [LINK VIDEO VIDEO_INROLARE] 
-                \n\nAvem nevoie de la tine de:
-                1. Poza de profil și un scurt video de prezentare.
-                2. O descriere scurtă a serviciilor tale.
-                3. Prețul tău estimativ pe oră.
-                4. Județele în care poți activa.`,
-                { 
-                    "Instrucțiuni": "Urmează link-ul de mai jos pentru a completa datele",
-                    "Deadline": "48 ore" 
+                "VEZI VIDEO DE ÎNROLARE",
+                "Salut " + alias + ", acum că ai contul creat, te rugăm să completezi datele profilului.\n\nUrmărește video-ul de înrolare aici: https://youtu.be/ID_VIDEO_AICI \n\nAvem nevoie de: Poză, Video, Descriere, Preț și Județe.",
+                {
+                    "Instrucțiuni": "Urmează link-ul de mai jos",
+                    "Status": "Așteptare Date"
                 },
-                "https://link-formular-date.ro", // Pune aici link-ul tău (Google Form / Pagina ta)
-                "COMPLETEAZĂ DATELE PROFILULUI"
+                (process.env.FRONTEND_URL || "") + "/onboarding",
+                "COMPLETEAZĂ DATELE"
             );
         }
         res.json({ success: true });
     }
-    catch {
-        res.status(500).json({ error: "DB Error" });
+    catch (error) {
+        console.error("Eroare creare erou:", error);
+        res.status(500).json({ error: "Internal Server Error" });
     }
 });
 app.put('/api/heroes/:id', authenticateToken, async (req, res) => {
