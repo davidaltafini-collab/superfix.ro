@@ -428,18 +428,18 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
                 "ACCESEAZĂ PORTALUL"
             );
 
-            // Email 2 - CORECTAT: am schimbat name cu alias
+            // Am adăugat ?id=" + hero.id la finalul link-ului
             await sendEmail(
                 email,
                 "PASUL 2: ACTIVAREA PROFILULUI TĂU",
                 "VEZI VIDEO DE ÎNROLARE",
-                "Salut " + alias + ", acum că ai contul creat, te rugăm să completezi datele profilului.\n\nUrmărește video-ul de înrolare aici: https://youtu.be/ID_VIDEO_AICI \n\nAvem nevoie de: Poză, Video, Descriere, Preț și Județe.",
+                "Salut " + alias + ", acum că ai contul creat, te rugăm să completezi datele profilului.\n\nUrmărește video-ul de înrolare aici: https://youtu.be/ID_VIDEO_AICI \n\nApasă butonul de mai jos pentru a încărca pozele și descrierea.",
                 {
-                    "Instrucțiuni": "Urmează link-ul de mai jos",
+                    "Instrucțiuni": "Link-ul este personalizat, nu necesită logare.",
                     "Status": "Așteptare Date"
                 },
-                (process.env.FRONTEND_URL || "") + "/onboarding",
-                "COMPLETEAZĂ DATELE"
+                (process.env.FRONTEND_URL || "") + "/onboarding?id=" + (await prisma.hero.findUnique({ where: { username } })).id,
+                "ÎNCARCĂ DATELE PROFILULUI"
             );
         }
         res.json({ success: true });
@@ -611,6 +611,30 @@ app.post('/api/hero/submit-update', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Eroare la trimiterea datelor." });
+    }
+});
+// Rută specială pentru onboarding direct din mail (fără logare)
+app.post('/api/hero/public-submit-update', async (req, res) => {
+    try {
+        const { heroId, avatarUrl, videoUrl, description, hourlyRate, actionAreas } = req.body;
+
+        if (!heroId) return res.status(400).json({ error: "Lipsește identificatorul eroului." });
+
+        await prisma.heroUpdate.create({
+            data: {
+                heroId: heroId,
+                avatarUrl,
+                videoUrl,
+                description,
+                hourlyRate: Number(hourlyRate),
+                actionAreas
+            }
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Eroare la procesarea datelor." });
     }
 });
 
