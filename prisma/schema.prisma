@@ -93,3 +93,20 @@ model HeroApplication {
   status   String   @default("PENDING")
   date     DateTime @default(now())
 }
+
+// === TABEL NOU: ACTUALIZĂRI ÎN AȘTEPTARE ===
+model HeroUpdate {
+  id          String   @id @default(uuid())
+  heroId      String
+  hero        Hero     @relation(fields: [heroId], references: [id], onDelete: Cascade)
+  
+  // Datele pe care vrea să le schimbe
+  avatarUrl   String?  @db.LongText
+  videoUrl    String?  @db.LongText
+  description String?  @db.Text
+  hourlyRate  Int?
+  actionAreas Json?    // Județele noi
+  
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt   DateTime @default(now())
+}

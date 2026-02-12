@@ -415,6 +415,25 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
         });
         if (email) {
             await sendEmail(email, "BINE AI VENIT!", "DOSAR APROBAT", `Salut ${alias}, ai fost recrutat oficial! Cu o putere mare vine și o responsabilitate mare (și facturi plătite la timp).`, { "User": username, "Parola": plainPassword }, `${process.env.FRONTEND_URL}/portal`, "ACCESEAZĂ PORTALUL");
+        // --- EMAILUL NR. 2: INSTRUCȚIUNI ȘI COLECTARE DATE ---
+            await sendEmail(
+                email,
+                "PASUL 2: ACTIVAREA PROFILULUI TĂU",
+                "BINE AI VENIT ÎN LIGĂ! VEZI VIDEO DE INROLARE",
+                `Salut ${name}, acum că ai contul creat, trebuie să ne trimiți detaliile pentru a-ți publica profilul pe site. 
+                \n\nTe rugăm să urmărești videoclipul de înrolare aici: [LINK VIDEO VIDEO_INROLARE] 
+                \n\nAvem nevoie de la tine de:
+                1. Poza de profil și un scurt video de prezentare.
+                2. O descriere scurtă a serviciilor tale.
+                3. Prețul tău estimativ pe oră.
+                4. Județele în care poți activa.`,
+                { 
+                    "Instrucțiuni": "Urmează link-ul de mai jos pentru a completa datele",
+                    "Deadline": "48 ore" 
+                },
+                "https://link-formular-date.ro", // Pune aici link-ul tău (Google Form / Pagina ta)
+                "COMPLETEAZĂ DATELE PROFILULUI"
+            );
         }
         res.json({ success: true });
     }
@@ -551,6 +570,88 @@ app.post('/api/reviews', async (req, res) => {
         res.status(500).json({ error: "Review error" });
     }
 });
+// === SISTEM UPDATE PROFIL (JavaScript pentru dist/server.js) ===
+
+// 1. Eroul trimite datele (Upload Formular)
+app.post('/api/hero/submit-update', authenticateToken, async (req, res) => {
+    try {
+        const { avatarUrl, videoUrl, description, hourlyRate, actionAreas } = req.body;
+        const heroId = req.user.id;
+
+        // Salvăm în tabelul de așteptare (HeroUpdate)
+        await prisma.heroUpdate.create({
+            data: {
+                heroId,
+                avatarUrl,
+                videoUrl,
+                description,
+                hourlyRate: Number(hourlyRate),
+                actionAreas
+            }
+        });
+
+        // Notificare Admin
+        await sendEmail(
+            process.env.EMAIL_USER,
+            "UPDATE PROFIL EROU",
+            "DATE NOI ÎN AȘTEPTARE",
+            `Eroul cu ID-ul ${heroId} a trimis date noi. Intră în admin să le aprobi.`,
+            { "Erou ID": heroId }
+        );
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Eroare la trimiterea datelor." });
+    }
+});
+
+// 2. Adminul vede cererile de update
+app.get('/api/admin/updates', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'ADMIN') return res.status(403).json({ error: "Forbidden" });
+    
+    const updates = await prisma.heroUpdate.findMany({
+        where: { status: 'PENDING' },
+        include: { hero: true },
+        orderBy: { createdAt: 'desc' }
+    });
+    res.json(updates);
+});
+
+// 3. ADMIN AUTO-REPLACE (Aprobare)
+app.post('/api/admin/approve-update/:updateId', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'ADMIN') return res.status(403).json({ error: "Forbidden" });
+
+    try {
+        const updateId = req.params.updateId;
+        
+        const updateRequest = await prisma.heroUpdate.findUnique({ where: { id: updateId } });
+        if (!updateRequest) return res.status(404).json({ error: "Update not found" });
+
+        // Actualizăm profilul eroului cu datele din cerere
+        const updateData = {};
+        if (updateRequest.avatarUrl) updateData.avatarUrl = updateRequest.avatarUrl;
+        if (updateRequest.videoUrl) updateData.videoUrl = updateRequest.videoUrl;
+        if (updateRequest.description) updateData.description = updateRequest.description;
+        if (updateRequest.hourlyRate) updateData.hourlyRate = updateRequest.hourlyRate;
+        if (updateRequest.actionAreas) updateData.actionAreas = updateRequest.actionAreas;
+
+        await prisma.hero.update({
+            where: { id: updateRequest.heroId },
+            data: updateData
+        });
+
+        // Ștergem cererea după ce a fost aplicată
+        await prisma.heroUpdate.delete({ where: { id: updateId } });
+
+        res.json({ success: true, message: "Profil actualizat automat!" });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Eroare la auto-replace" });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`🚀 Server Backend "SuperFix" rulează pe portul ${PORT}`);
 });
