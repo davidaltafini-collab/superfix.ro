@@ -546,7 +546,7 @@ app.put('/api/missions/:id/status', authenticateToken, async (req, res) => {
             }
             else if (status === 'COMPLETED') {
                 const randomMsg = getRandomMsg('MISSION_COMPLETED');
-                await sendEmail(mission.clientEmail, "MISIUNE ÎNDEPLINITĂ", "DOSAR ÎNCHIS", randomMsg, { "Rezultat": "SUCCES", "Erou": mission.hero.alias }, `${process.env.FRONTEND_URL}/hero/${mission.hero.id}`, "LASĂ O RECENZIE");
+                await sendEmail(mission.clientEmail, "MISIUNE ÎNDEPLINITĂ", "DOSAR ÎNCHIS", randomMsg, { "Rezultat": "SUCCES", "Erou": mission.hero.alias }, `${process.env.FRONTEND_URL}/hero/${mission.hero.slug || mission.hero.id}`, "LASĂ O RECENZIE");
             }
         }
         await prisma.serviceRequest.update({
@@ -603,8 +603,13 @@ app.post('/api/hero/submit-update', authenticateToken, async (req, res) => {
             process.env.EMAIL_USER,
             "UPDATE PROFIL EROU",
             "DATE NOI ÎN AȘTEPTARE",
-            `Eroul cu ID-ul ${heroId} a trimis date noi. Intră în admin să le aprobi.`,
-            { "Erou ID": heroId }
+            `Agentul a trimis date noi pentru aprobare. Intră în portalul Admin pentru a valida profilul.`,
+            {
+                "Nume Nou Propus": alias || 'Nespecificat',
+                "Link Erou": heroInfo?.slug ? `${process.env.FRONTEND_URL}/hero/${heroInfo.slug}` : "Fără link generat încă"
+            },
+            `${process.env.FRONTEND_URL}/admin`, // <--- Link-ul butonului
+            "DESCHIDE PORTAL ADMIN"              // <--- Textul butonului
         );
 
         res.json({ success: true });
@@ -647,6 +652,7 @@ app.post('/api/hero/public-submit-update', async (req, res) => {
                 actionAreas
             }
         });
+        const heroInfo = await prisma.hero.findUnique({ where: { id: heroId } });
 
         // Trimitem mail la admin ca să știe de update
         await sendEmail(
