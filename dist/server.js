@@ -487,7 +487,7 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
 
             // ✅ EMAIL 2: Onboarding SIMPLIFICAT
             const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-            const youtubeLink = "https://youtube.com/shorts/qlgBAqtwgcI?si=aU7hANKvO317h5HJ"; // <--- Vei completa tu
+            const youtubeLink = "https://www.youtube.com/embed/qlgBAqtwgcI"; // <--- Vei completa tu
             const onboardingLink = `${frontendUrl}/onboarding?id=${newHero.id}`;
             
             console.log(`🔗 Link onboarding generat: ${onboardingLink}`);
