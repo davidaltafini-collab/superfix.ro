@@ -466,12 +466,30 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
         const passwordHash = await bcrypt.hash(plainPassword, 10);
         const trustFactor = rest.trustFactor || 50;
 
+        // 🌟 NOU: Generăm automat slug-ul din Alias (sau Username) chiar la recrutare
+        const heroSlug = (alias || username)
+            .toLowerCase()
+            .trim()
+            .replace(/[^\w\s-]/g, '')
+            .replace(/[\s_-]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+
+        // 🌟 MODIFICAT: Includem `slug: heroSlug` în datele salvate în Prisma
         const newHero = await prisma.hero.create({
-            data: { username, alias, passwordHash, email, trustFactor, missionsCompleted: 0, ...rest }
+            data: { 
+                username, 
+                alias, 
+                slug: heroSlug, // <--- Aici adăugăm URL-ul frumos direct de la început!
+                passwordHash, 
+                email, 
+                trustFactor, 
+                missionsCompleted: 0, 
+                ...rest 
+            }
         });
 
         if (email) {
-            // ✅ EMAIL 1: Credențiale de acces (FĂRĂ link în dataFields)
+            // ✅ EMAIL 1: Credențiale de acces
             await sendEmail(
                 email,
                 "BINE AI VENIT ÎN LIGĂ!",
@@ -485,9 +503,12 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
                 "INTRĂ ÎN PORTAL"
             );
 
-            // ✅ EMAIL 2: Onboarding SIMPLIFICAT
+            // ✅ EMAIL 2: Onboarding
             const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-            const youtubeLink = "https://www.youtube.com/embed/qlgBAqtwgcI"; // <--- Vei completa tu
+            const youtubeLink = "https://www.youtube.com/embed/qlgBAqtwgcI"; 
+            
+            // Dacă vrei ca link-ul de onboarding să folosească direct slug-ul, poți schimba 'id=' cu 'slug=' mai jos:
+            // const onboardingLink = `${frontendUrl}/onboarding?slug=${newHero.slug}`;
             const onboardingLink = `${frontendUrl}/onboarding?id=${newHero.id}`;
             
             console.log(`🔗 Link onboarding generat: ${onboardingLink}`);
@@ -498,7 +519,7 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
                 "PASUL 2: ACTIVEAZĂ-ȚI PROFILUL",
                 "COMPLETEAZĂ ÎNROLAREA",
                 `Salut ${alias}! Poți prelua misiuni, dar mai trebuie să termini procesul de înrolare. Apasă butonul de mai jos pentru a completa datele profilului tău.`,
-                {}, // Fără dataFields
+                {}, 
                 onboardingLink,
                 "TERMINĂ ÎNROLAREA"
             );
@@ -506,7 +527,7 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
             console.log(`✅ Ambele emailuri trimise cu succes către ${email}`);
         }
         
-        res.json({ success: true, heroId: newHero.id });
+        res.json({ success: true, heroId: newHero.id, slug: newHero.slug }); // Am returnat și slug-ul
     }
     catch (error) {
         console.error("❌ Eroare creare erou:", error);
