@@ -455,7 +455,7 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
                 "INTRĂ ÎN PORTAL"
             );
 
-            // ✅ EMAIL 2: Onboarding cu 2 pași clari
+            // ✅ EMAIL 2: Onboarding cu pași stilizați și UN singur buton
             const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
             const youtubeLink = "LINK_VIDEO_YOUTUBE_AICI"; // <--- Vei completa tu
             const onboardingLink = `${frontendUrl}/onboarding?id=${newHero.id}`;
@@ -463,31 +463,32 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
             console.log(`🔗 Link onboarding generat: ${onboardingLink}`);
             console.log(`📧 Trimitem email onboarding către: ${email}`);
             
+            // Construim pașii stilizați ca în template
+            const stepsHtml = `
+                <div style="background-color: #fffbeb; border: 4px solid #000; padding: 15px; margin-bottom: 15px; position: relative;">
+                    <div style="position: absolute; top: -12px; left: 15px; background: #000; color: #fff; padding: 4px 12px; font-weight: bold; font-size: 12px;">PAS 1</div>
+                    <div style="font-size: 18px; font-weight: 900; margin-bottom: 8px; text-transform: uppercase;">📹 Vizualizează Video-ul</div>
+                    <div style="font-size: 14px; color: #555;">Accesează acest link pentru a vedea cum funcționează platforma:</div>
+                    <div style="margin-top: 10px; font-family: 'Courier New', monospace; background: #fff; border: 2px dashed #000; padding: 8px; font-size: 12px; word-break: break-all;">
+                        <a href="${youtubeLink}" style="color: #dc2626; text-decoration: underline;">${youtubeLink}</a>
+                    </div>
+                </div>
+
+                <div style="background-color: #fffbeb; border: 4px solid #000; padding: 15px; margin-bottom: 15px; position: relative;">
+                    <div style="position: absolute; top: -12px; left: 15px; background: #000; color: #fff; padding: 4px 12px; font-weight: bold; font-size: 12px;">PAS 2</div>
+                    <div style="font-size: 18px; font-weight: 900; margin-bottom: 8px; text-transform: uppercase;">📝 Completează Datele</div>
+                    <div style="font-size: 14px; color: #555;">Apasă butonul de mai jos și încarcă pozele, video-ul tău de prezentare și selectează zonele în care lucrezi.</div>
+                </div>
+            `;
+            
             await sendEmail(
                 email,
                 "PASUL 2: ACTIVEAZĂ-ȚI PROFILUL",
                 "INSTRUCȚIUNI DE ÎNROLARE",
-                `Salut ${alias}! Înainte de a putea prelua misiuni, trebuie să-ți completezi profilul public. Urmează acești 2 pași simpli:
-
-<div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
-    <strong style="font-size: 18px;">📹 PAS 1: VIZUALIZEAZĂ VIDEO-UL DE ÎNROLARE</strong><br>
-    <span style="color: #666;">Află cum funcționează platforma și ce trebuie să știi</span><br>
-    <a href="${youtubeLink}" style="display: inline-block; margin-top: 10px; background: #dc2626; color: #fff; padding: 10px 20px; text-decoration: none; font-weight: bold; border: 2px solid #000;">▶️ VEZI VIDEO</a>
-</div>
-
-<div style="background: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
-    <strong style="font-size: 18px;">📝 PAS 2: COMPLETEAZĂ DATELE PROFILULUI</strong><br>
-    <span style="color: #666;">Încarcă pozele, video-ul tău și selectează zonele de acțiune</span><br>
-    <a href="${onboardingLink}" style="display: inline-block; margin-top: 10px; background: #3b82f6; color: #fff; padding: 10px 20px; text-decoration: none; font-weight: bold; border: 2px solid #000;">🚀 ÎNCEPE ACUM</a>
-</div>
-
-<strong>Important:</strong> Link-ul din Pasul 2 este personalizat pentru tine și nu necesită logare.`,
-                {
-                    "Status Curent": "Așteptare Completare Profil",
-                    "ID Erou": newHero.id
-                },
+                `Salut ${alias}! Înainte să poți prelua misiuni, trebuie să-ți completezi profilul public.${stepsHtml}<strong>Link-ul este personalizat pentru tine și nu necesită logare.</strong>`,
+                {}, // Fără dataFields suplimentare
                 onboardingLink,
-                "ÎNCEPE COMPLETAREA PROFILULUI"
+                "ÎNCEPE ÎNROLAREA"
             );
             
             console.log(`✅ Ambele emailuri trimise cu succes către ${email}`);
