@@ -614,15 +614,32 @@ app.post('/api/hero/submit-update', authenticateToken, async (req, res) => {
     }
 });
 // Rută specială pentru onboarding direct din mail (fără logare)
+// Rută specială pentru onboarding direct din mail (fără logare)
 app.post('/api/hero/public-submit-update', async (req, res) => {
     try {
-        const { heroId, avatarUrl, videoUrl, description, hourlyRate, actionAreas } = req.body;
+        const { heroId, alias, avatarUrl, videoUrl, description, hourlyRate, actionAreas } = req.body;
 
         if (!heroId) return res.status(400).json({ error: "Lipsește identificatorul eroului." });
 
+        // === MAGIA: Verificăm dacă numele este deja luat de ALT erou ===
+        if (alias) {
+            // Căutăm eroi activi cu același nume (ignorăm litere mari/mici)
+            const existingHero = await prisma.hero.findFirst({
+                where: {
+                    alias: { equals: alias, mode: 'insensitive' },
+                    id: { not: heroId } // excludem eroul curent în caz că și-a pus același nume pe care îl avea deja
+                }
+            });
+            if (existingHero) {
+                return res.status(400).json({ error: "Acest nume de erou este deja luat în Ligă! Fii creativ și alege altul (ex: Gigel VIP)." });
+            }
+        }
+
+        // Salvăm cererea în baza de date
         await prisma.heroUpdate.create({
             data: {
-                heroId: heroId,
+                heroId,
+                alias, // Salvăm numele nou cerut
                 avatarUrl,
                 videoUrl,
                 description,
@@ -630,6 +647,15 @@ app.post('/api/hero/public-submit-update', async (req, res) => {
                 actionAreas
             }
         });
+
+        // Trimitem mail la admin ca să știe de update
+        await sendEmail(
+            process.env.EMAIL_USER,
+            "UPDATE PROFIL EROU",
+            "DATE NOI ÎN AȘTEPTARE",
+            `Eroul cu ID-ul ${heroId} a trimis date noi și și-a ales numele: ${alias || 'Nespecificat'}. Intră în admin să le aprobi.`,
+            { "Erou ID": heroId }
+        );
 
         res.json({ success: true });
     } catch (error) {
