@@ -488,6 +488,29 @@ app.get('/api/heroes', async (req, res) => {
     const heroes = await prisma.hero.findMany({ include: { reviews: true } });
     res.json(heroes);
 });
+// Rută care găsește eroul fie după nume (slug), fie după ID-ul vechi
+app.get('/api/heroes/slug/:slug', async (req, res) => {
+    const { slug } = req.params;
+    try {
+        let hero = await prisma.hero.findUnique({
+            where: { slug: slug },
+            include: { reviews: true }
+        });
+
+        // Dacă nu e găsit după slug, îl căutăm după ID (pentru link-urile vechi)
+        if (!hero) {
+            hero = await prisma.hero.findUnique({
+                where: { id: slug },
+                include: { reviews: true }
+            });
+        }
+
+        if (!hero) return res.status(404).json({ error: "Erou negăsit" });
+        res.json(hero);
+    } catch (e) {
+        res.status(500).json({ error: "Eroare server" });
+    }
+});
 app.get('/api/heroes/:id', async (req, res) => {
     const hero = await prisma.hero.findUnique({ where: { id: req.params.id }, include: { reviews: true } });
     res.json(hero || {});
@@ -654,13 +677,18 @@ app.post('/api/hero/public-submit-update', async (req, res) => {
         });
         const heroInfo = await prisma.hero.findUnique({ where: { id: heroId } });
 
-        // Trimitem mail la admin ca să știe de update
+        // Trimitem mail la admin cu buton și info curat
         await sendEmail(
             process.env.EMAIL_USER,
             "UPDATE PROFIL EROU",
             "DATE NOI ÎN AȘTEPTARE",
-            `Eroul cu ID-ul ${heroId} a trimis date noi și și-a ales numele: ${alias || 'Nespecificat'}. Intră în admin să le aprobi.`,
-            { "Erou ID": heroId }
+            `Eroul ${heroInfo?.alias || 'Nou'} a trimis date noi pentru profilul său.`,
+            {
+                "Nume Nou Propus": alias || 'Nespecificat',
+                "Erou Actual": heroInfo?.alias || 'Nespecificat'
+            },
+            `${process.env.FRONTEND_URL}/admin`,
+            "DESCHIDE PORTAL ADMIN"
         );
 
         res.json({ success: true });
@@ -688,31 +716,37 @@ app.post('/api/admin/approve-update/:updateId', authenticateToken, async (req, r
 
     try {
         const updateId = req.params.updateId;
-        
         const updateRequest = await prisma.heroUpdate.findUnique({ where: { id: updateId } });
         if (!updateRequest) return res.status(404).json({ error: "Update not found" });
 
-        // Actualizăm profilul eroului cu datele din cerere
         const updateData = {};
         if (updateRequest.avatarUrl) updateData.avatarUrl = updateRequest.avatarUrl;
         if (updateRequest.videoUrl) updateData.videoUrl = updateRequest.videoUrl;
         if (updateRequest.description) updateData.description = updateRequest.description;
         if (updateRequest.hourlyRate) updateData.hourlyRate = updateRequest.hourlyRate;
         if (updateRequest.actionAreas) updateData.actionAreas = updateRequest.actionAreas;
+        
+        // MAGIA: Dacă eroul și-a ales un Alias, generăm URL-ul curat (slug)
+        if (updateRequest.alias) {
+            updateData.alias = updateRequest.alias;
+            updateData.slug = updateRequest.alias
+                .toLowerCase()
+                .trim()
+                .replace(/[^\w\s-]/g, '') // scoatem caractere speciale
+                .replace(/[\s_-]+/g, '-') // înlocuim spații cu cratimă
+                .replace(/^-+|-+$/g, ''); // curățăm marginile
+        }
 
         await prisma.hero.update({
             where: { id: updateRequest.heroId },
             data: updateData
         });
 
-        // Ștergem cererea după ce a fost aplicată
         await prisma.heroUpdate.delete({ where: { id: updateId } });
-
-        res.json({ success: true, message: "Profil actualizat automat!" });
-
+        res.json({ success: true, message: "Profil actualizat cu URL curat!" });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Eroare la auto-replace" });
+        res.status(500).json({ error: "Eroare la aprobare" });
     }
 });
 // 4. ADMIN REJECT/CANCEL UPDATE
