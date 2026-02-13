@@ -92,7 +92,6 @@ app.get('/sitemap.xml', async (req, res) => {
 
 // === MESAJE "CATERINCĂ" (Stil Superfix) ===
 const FUNNY_MESSAGES = {
-    // Mesaje pentru EROU (Când primește o misiune nouă)
     HERO_ALERT: [
         "Știu că probabil salvezi planeta (sau bei o cafea), dar avem o urgență!",
         "Lăsați totul jos! Cineva are nevoie de tine mai mult decât are nevoie Batman de Robin.",
@@ -105,7 +104,6 @@ const FUNNY_MESSAGES = {
         "Ai un nou dosar pe birou. Sper că ți-ai luat pelerina la tine azi.",
         "Cetățenii strigă după ajutor! E momentul tău de glorie (și de făcut bani)."
     ],
-    // Mesaje pentru CLIENT (Când așteaptă răspuns)
     CLIENT_WAITING: [
         "Semnalul a fost trimis! Eroul nostru își termină probabil gogoașa și revine.",
         "Am lansat porumbelul digital. Acum așteptăm să vedem dacă eroul e disponibil.",
@@ -118,7 +116,6 @@ const FUNNY_MESSAGES = {
         "Sistemul nostru a alertat specialistul. Să vedem dacă acceptă provocarea!",
         "Eroul știe de tine. Acum e o chestiune de minute până răspunde."
     ],
-    // Mesaje ACCEPT (Când eroul zice DA)
     MISSION_ACCEPTED: [
         "Veste bună! Eroul a zis 'DA'. Pregătește-te, ajutorul e pe drum!",
         "Avem confirmare! Eroul și-a pus centura și vine spre tine.",
@@ -131,7 +128,6 @@ const FUNNY_MESSAGES = {
         "Start misiune! Eroul a plecat spre locația ta.",
         "Confirmare primită. Eroul nostru e gata de acțiune!"
     ],
-    // Mesaje REJECT (Când eroul e ocupat)
     MISSION_REJECTED: [
         "Ghinion! Eroul e prins într-o luptă crâncenă (probabil are altă lucrare).",
         "Din păcate, eroul nostru e indisponibil momentan. Dar nu renunța!",
@@ -144,7 +140,6 @@ const FUNNY_MESSAGES = {
         "Eroul e indisponibil. Probabil salvează lumea în alt cartier.",
         "Refuz tactic. Eroul nu poate ajunge. Te rugăm să selectezi alt profesionist."
     ],
-    // Mesaje COMPLETE (La final)
     MISSION_COMPLETED: [
         "Misiune Îndeplinită! Încă o zi, încă o problemă rezolvată.",
         "Boom! S-a rezolvat. Eroul și-a făcut treaba și a dispărut în apus.",
@@ -166,7 +161,6 @@ const getRandomMsg = (type) => {
 
 // === TEMPLATE EMAIL "DOSAR APLICAȚIE" (DESIGN FIX CA ÎN POZĂ) ===
 const getSuperfixTemplate = (title, message, dataFields = {}, ctaLink, ctaText) => {
-    // Construim HTML-ul pentru câmpurile de date (stil galben punctat)
     let fieldsHtml = '';
     for (const [key, value] of Object.entries(dataFields)) {
         fieldsHtml += `
@@ -198,10 +192,9 @@ const getSuperfixTemplate = (title, message, dataFields = {}, ctaLink, ctaText) 
         border-bottom: 4px solid #000;
         position: relative;
     }
-    /* LOGO ROSU SIMPLU (FARA FULGERE) */
     .logo-box {
         display: inline-block;
-        background-color: #ef4444; /* Rosu intens */
+        background-color: #ef4444;
         padding: 10px 20px;
         border: 3px solid #000;
         transform: rotate(-2deg);
@@ -217,8 +210,6 @@ const getSuperfixTemplate = (title, message, dataFields = {}, ctaLink, ctaText) 
         letter-spacing: -1px;
         line-height: 1;
     }
-    
-    /* STAMPILA CONFIDENTIAL */
     .stamp {
         position: absolute;
         top: 20px;
@@ -232,9 +223,7 @@ const getSuperfixTemplate = (title, message, dataFields = {}, ctaLink, ctaText) 
         font-size: 14px;
         opacity: 0.7;
     }
-
     .content { padding: 30px; }
-    
     .title {
         font-family: 'Inter', sans-serif;
         font-weight: 900;
@@ -244,7 +233,6 @@ const getSuperfixTemplate = (title, message, dataFields = {}, ctaLink, ctaText) 
         border-bottom: 4px solid #000;
         display: inline-block;
     }
-
     .message {
         font-size: 16px;
         line-height: 1.6;
@@ -252,7 +240,6 @@ const getSuperfixTemplate = (title, message, dataFields = {}, ctaLink, ctaText) 
         margin-bottom: 20px;
         font-style: italic;
     }
-
     .btn {
         display: block;
         width: fit-content;
@@ -271,7 +258,6 @@ const getSuperfixTemplate = (title, message, dataFields = {}, ctaLink, ctaText) 
         background-color: #000;
         color: #fff !important;
     }
-
     .footer {
         background: #000;
         color: #fff;
@@ -359,7 +345,6 @@ app.post('/api/apply-hero', async (req, res) => {
         
         await prisma.heroApplication.create({ data: { name, email, phone, category, message } });
         
-        // Email Admin
         await sendEmail(
             process.env.EMAIL_USER,
             "APLICAȚIE NOUĂ",
@@ -368,7 +353,6 @@ app.post('/api/apply-hero', async (req, res) => {
             { "Candidat": name, "Specializare": category, "Contact": phone }
         );
         
-        // Email Applicant
         await sendEmail(
             email,
             "APLICAȚIE PRIMITĂ",
@@ -404,13 +388,11 @@ app.delete('/api/admin/applications/:id', authenticateToken, async (req, res) =>
         });
         
         if (application) {
-            // Verificăm dacă a fost deja acceptat
             const isAccepted = await prisma.hero.findFirst({
                 where: { email: application.email }
             });
 
             if (!isAccepted) {
-                // Trimitem email de respingere DOAR dacă nu a fost acceptat
                 await sendEmail(
                     application.email,
                     "STATUS APLICAȚIE",
@@ -432,37 +414,50 @@ app.delete('/api/admin/applications/:id', authenticateToken, async (req, res) =>
     }
 });
 
-// === FIX PRINCIPAL: CREAREA EROULUI CU EMAIL ONBOARDING CORECT ===
+// === ✅ FIX PRINCIPAL: VALIDARE EMAIL + ALIAS DUPLICAT + EMAIL ÎN 2 PAȘI ===
 app.post('/api/heroes', authenticateToken, async (req, res) => {
     try {
         const { username, alias, password, email, ...rest } = req.body;
-        const existing = await prisma.hero.findUnique({ where: { username } });
-        if (existing)
-            return res.status(400).json({ error: "Username luat!" });
+        
+        // ✅ VALIDARE 1: Username duplicat
+        const existingUsername = await prisma.hero.findUnique({ where: { username } });
+        if (existingUsername)
+            return res.status(400).json({ error: "Username-ul este deja folosit!" });
+
+        // ✅ VALIDARE 2: Email duplicat (IMPORTANT!)
+        if (email) {
+            const existingEmail = await prisma.hero.findFirst({ where: { email } });
+            if (existingEmail)
+                return res.status(400).json({ error: "Acest email are deja un cont de erou!" });
+        }
 
         const plainPassword = password || "Hero123!";
         const passwordHash = await bcrypt.hash(plainPassword, 10);
         const trustFactor = rest.trustFactor || 50;
 
-        // Creăm eroul
         const newHero = await prisma.hero.create({
             data: { username, alias, passwordHash, email, trustFactor, missionsCompleted: 0, ...rest }
         });
 
         if (email) {
-            // Email 1: Bun venit și Credențiale
+            // ✅ EMAIL 1: Credențiale de acces
             await sendEmail(
                 email,
-                "BINE AI VENIT!",
-                "DOSAR APROBAT",
-                `Salut ${alias}, ai fost recrutat oficial în Liga SuperFix! Cu o putere mare vine și o responsabilitate mare.`,
-                { "Utilizator": username, "Parola": plainPassword },
+                "BINE AI VENIT ÎN LIGĂ!",
+                "DOSAR APROBAT - ACCES PORTAL",
+                `Salut ${alias}, ai fost recrutat oficial în Liga SuperFix! Iată datele tale de acces la Portal:`,
+                { 
+                    "Username": username, 
+                    "Parola": plainPassword,
+                    "Link Portal": `${process.env.FRONTEND_URL}/portal`
+                },
                 `${process.env.FRONTEND_URL}/portal`,
-                "ACCESEAZĂ PORTALUL"
+                "INTRĂ ÎN PORTAL"
             );
 
-            // === FIX: Email 2 cu verificări și logging ===
+            // ✅ EMAIL 2: Onboarding cu 2 pași clari
             const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const youtubeLink = "LINK_VIDEO_YOUTUBE_AICI"; // <--- Vei completa tu
             const onboardingLink = `${frontendUrl}/onboarding?id=${newHero.id}`;
             
             console.log(`🔗 Link onboarding generat: ${onboardingLink}`);
@@ -470,26 +465,39 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
             
             await sendEmail(
                 email,
-                "PASUL 2: ACTIVAREA PROFILULUI TĂU",
-                "COMPLETEZĂ PROFILUL",
-                `Salut ${alias}! Acum că ai contul creat, te rugăm să completezi datele profilului tău. Apasă butonul de mai jos pentru a încărca pozele, video-ul și descrierea ta.`,
+                "PASUL 2: ACTIVEAZĂ-ȚI PROFILUL",
+                "INSTRUCȚIUNI DE ÎNROLARE",
+                `Salut ${alias}! Înainte de a putea prelua misiuni, trebuie să-ți completezi profilul public. Urmează acești 2 pași simpli:
+
+<div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
+    <strong style="font-size: 18px;">📹 PAS 1: VIZUALIZEAZĂ VIDEO-UL DE ÎNROLARE</strong><br>
+    <span style="color: #666;">Află cum funcționează platforma și ce trebuie să știi</span><br>
+    <a href="${youtubeLink}" style="display: inline-block; margin-top: 10px; background: #dc2626; color: #fff; padding: 10px 20px; text-decoration: none; font-weight: bold; border: 2px solid #000;">▶️ VEZI VIDEO</a>
+</div>
+
+<div style="background: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
+    <strong style="font-size: 18px;">📝 PAS 2: COMPLETEAZĂ DATELE PROFILULUI</strong><br>
+    <span style="color: #666;">Încarcă pozele, video-ul tău și selectează zonele de acțiune</span><br>
+    <a href="${onboardingLink}" style="display: inline-block; margin-top: 10px; background: #3b82f6; color: #fff; padding: 10px 20px; text-decoration: none; font-weight: bold; border: 2px solid #000;">🚀 ÎNCEPE ACUM</a>
+</div>
+
+<strong>Important:</strong> Link-ul din Pasul 2 este personalizat pentru tine și nu necesită logare.`,
                 {
-                    "Instrucțiuni": "Link-ul este personalizat, nu necesită logare.",
-                    "Status": "Așteptare Date",
+                    "Status Curent": "Așteptare Completare Profil",
                     "ID Erou": newHero.id
                 },
                 onboardingLink,
-                "ÎNCARCĂ DATELE PROFILULUI"
+                "ÎNCEPE COMPLETAREA PROFILULUI"
             );
             
-            console.log(`✅ Email onboarding trimis cu succes`);
+            console.log(`✅ Ambele emailuri trimise cu succes către ${email}`);
         }
         
-        res.json({ success: true });
+        res.json({ success: true, heroId: newHero.id });
     }
     catch (error) {
-        console.error("Eroare creare erou:", error);
-        res.status(500).json({ error: "Internal Server Error" });
+        console.error("❌ Eroare creare erou:", error);
+        res.status(500).json({ error: "Eroare internă server" });
     }
 });
 
@@ -498,7 +506,6 @@ app.put('/api/heroes/:id', authenticateToken, async (req, res) => {
     try {
         const dataToUpdate = { ...req.body };
         
-        // Dacă editezi Alias-ul, generăm și slug-ul automat
         if (dataToUpdate.alias) {
             dataToUpdate.slug = dataToUpdate.alias
                 .toLowerCase()
@@ -721,7 +728,6 @@ app.post('/api/hero/submit-update', authenticateToken, async (req, res) => {
             }
         });
 
-        // === FIX: Obținem info erou ÎNAINTE de mail ===
         const heroInfo = await prisma.hero.findUnique({ where: { id: heroId } });
 
         await sendEmail(
@@ -744,14 +750,14 @@ app.post('/api/hero/submit-update', authenticateToken, async (req, res) => {
     }
 });
 
-// === FIX: Rută onboarding cu verificare duplicate nume ===
+// === ✅ ONBOARDING PUBLIC CU VALIDARE ALIAS DUPLICAT ===
 app.post('/api/hero/public-submit-update', async (req, res) => {
     try {
         const { heroId, alias, avatarUrl, videoUrl, description, hourlyRate, actionAreas } = req.body;
 
         if (!heroId) return res.status(400).json({ error: "Lipsește identificatorul eroului." });
 
-        // Verificăm dacă numele este luat de alt erou
+        // ✅ VALIDARE: Verificăm dacă numele este luat de ALT erou
         if (alias) {
             const existingHero = await prisma.hero.findFirst({
                 where: {
@@ -760,7 +766,9 @@ app.post('/api/hero/public-submit-update', async (req, res) => {
                 }
             });
             if (existingHero) {
-                return res.status(400).json({ error: "Acest nume de erou este deja luat în Ligă! Fii creativ și alege altul (ex: Gigel VIP)." });
+                return res.status(400).json({ 
+                    error: "Acest nume de erou este deja luat în Ligă! Fii creativ și alege altul (ex: Gigel VIP, Super Instalatorul)." 
+                });
             }
         }
 
