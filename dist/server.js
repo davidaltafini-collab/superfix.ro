@@ -343,16 +343,47 @@ app.post('/api/apply-hero', async (req, res) => {
     try {
         const { name, email, phone, category, message } = req.body;
         
+        // ✅ VERIFICARE: Email duplicat în aplicații
+        const existingApplication = await prisma.heroApplication.findFirst({
+            where: { email }
+        });
+        
+        if (existingApplication) {
+            return res.status(400).json({ 
+                error: "Ai deja o aplicație înregistrată cu acest email! Verifică inbox-ul sau așteaptă răspunsul nostru." 
+            });
+        }
+        
+        // ✅ VERIFICARE: Email deja erou activ
+        const existingHero = await prisma.hero.findFirst({
+            where: { email }
+        });
+        
+        if (existingHero) {
+            return res.status(400).json({ 
+                error: "Acest email are deja un cont de erou activ! Încearcă să te loghezi în portal." 
+            });
+        }
+        
         await prisma.heroApplication.create({ data: { name, email, phone, category, message } });
         
+        // ✅ Email Admin cu BUTON
         await sendEmail(
             process.env.EMAIL_USER,
             "APLICAȚIE NOUĂ",
             "DOSAR RECRUT",
-            `Un nou civil vrea să devină erou! Verifică dacă are stofă de Superfix.\n\nMESAJ EROU:\n"${message || 'Niciun mesaj'}"`,
-            { "Candidat": name, "Specializare": category, "Contact": phone }
+            `Un nou civil vrea să devină erou! Verifică dacă are stofă de Superfix.`,
+            { 
+                "Candidat": name, 
+                "Specializare": category, 
+                "Contact": phone,
+                "Mesaj": message || 'Niciun mesaj'
+            },
+            `${process.env.FRONTEND_URL}/admin`,
+            "DESCHIDE PORTAL ADMIN"
         );
         
+        // Email Applicant
         await sendEmail(
             email,
             "APLICAȚIE PRIMITĂ",
@@ -440,7 +471,7 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
         });
 
         if (email) {
-            // ✅ EMAIL 1: Credențiale de acces
+            // ✅ EMAIL 1: Credențiale de acces (FĂRĂ link în dataFields)
             await sendEmail(
                 email,
                 "BINE AI VENIT ÎN LIGĂ!",
@@ -448,14 +479,13 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
                 `Salut ${alias}, ai fost recrutat oficial în Liga SuperFix! Iată datele tale de acces la Portal:`,
                 { 
                     "Username": username, 
-                    "Parola": plainPassword,
-                    "Link Portal": `${process.env.FRONTEND_URL}/portal`
+                    "Parola": plainPassword
                 },
                 `${process.env.FRONTEND_URL}/portal`,
                 "INTRĂ ÎN PORTAL"
             );
 
-            // ✅ EMAIL 2: Onboarding cu pași stilizați și UN singur buton
+            // ✅ EMAIL 2: Onboarding SIMPLIFICAT
             const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
             const youtubeLink = "LINK_VIDEO_YOUTUBE_AICI"; // <--- Vei completa tu
             const onboardingLink = `${frontendUrl}/onboarding?id=${newHero.id}`;
@@ -463,32 +493,14 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
             console.log(`🔗 Link onboarding generat: ${onboardingLink}`);
             console.log(`📧 Trimitem email onboarding către: ${email}`);
             
-            // Construim pașii stilizați ca în template
-            const stepsHtml = `
-                <div style="background-color: #fffbeb; border: 4px solid #000; padding: 15px; margin-bottom: 15px; position: relative;">
-                    <div style="position: absolute; top: -12px; left: 15px; background: #000; color: #fff; padding: 4px 12px; font-weight: bold; font-size: 12px;">PAS 1</div>
-                    <div style="font-size: 18px; font-weight: 900; margin-bottom: 8px; text-transform: uppercase;">📹 Vizualizează Video-ul</div>
-                    <div style="font-size: 14px; color: #555;">Accesează acest link pentru a vedea cum funcționează platforma:</div>
-                    <div style="margin-top: 10px; font-family: 'Courier New', monospace; background: #fff; border: 2px dashed #000; padding: 8px; font-size: 12px; word-break: break-all;">
-                        <a href="${youtubeLink}" style="color: #dc2626; text-decoration: underline;">${youtubeLink}</a>
-                    </div>
-                </div>
-
-                <div style="background-color: #fffbeb; border: 4px solid #000; padding: 15px; margin-bottom: 15px; position: relative;">
-                    <div style="position: absolute; top: -12px; left: 15px; background: #000; color: #fff; padding: 4px 12px; font-weight: bold; font-size: 12px;">PAS 2</div>
-                    <div style="font-size: 18px; font-weight: 900; margin-bottom: 8px; text-transform: uppercase;">📝 Completează Datele</div>
-                    <div style="font-size: 14px; color: #555;">Apasă butonul de mai jos și încarcă pozele, video-ul tău de prezentare și selectează zonele în care lucrezi.</div>
-                </div>
-            `;
-            
             await sendEmail(
                 email,
                 "PASUL 2: ACTIVEAZĂ-ȚI PROFILUL",
-                "INSTRUCȚIUNI DE ÎNROLARE",
-                `Salut ${alias}! Înainte să poți prelua misiuni, trebuie să-ți completezi profilul public.${stepsHtml}<strong>Link-ul este personalizat pentru tine și nu necesită logare.</strong>`,
-                {}, // Fără dataFields suplimentare
+                "COMPLETEAZĂ ÎNROLAREA",
+                `Salut ${alias}! Poți prelua misiuni, dar mai trebuie să termini procesul de înrolare. Apasă butonul de mai jos pentru a completa datele profilului tău.`,
+                {}, // Fără dataFields
                 onboardingLink,
-                "ÎNCEPE ÎNROLAREA"
+                "TERMINĂ ÎNROLAREA"
             );
             
             console.log(`✅ Ambele emailuri trimise cu succes către ${email}`);
