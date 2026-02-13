@@ -450,26 +450,41 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
     }
 });
 app.put('/api/heroes/:id', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'ADMIN')
-        return res.status(403).json({ error: "Forbidden" });
+    if (req.user.role !== 'ADMIN') return res.status(403).json({ error: "Forbidden" });
     try {
         const dataToUpdate = { ...req.body };
+        
+        // --- MAGIE PENTRU URL CURAT ---
+        // Dacă editezi Alias-ul, generăm și slug-ul automat
+        if (dataToUpdate.alias) {
+            dataToUpdate.slug = dataToUpdate.alias
+                .toLowerCase()
+                .trim()
+                .replace(/[^\w\s-]/g, '')
+                .replace(/[\s_-]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+        }
+
         if (dataToUpdate.password) {
             dataToUpdate.passwordHash = await bcrypt.hash(dataToUpdate.password, 10);
             delete dataToUpdate.password;
-        }
-        else {
+        } else {
             delete dataToUpdate.password;
         }
+
         delete dataToUpdate.id;
         delete dataToUpdate.reviews;
         delete dataToUpdate.requests;
         delete dataToUpdate.createdAt;
         delete dataToUpdate.updatedAt;
-        const updated = await prisma.hero.update({ where: { id: req.params.id }, data: dataToUpdate });
+
+        const updated = await prisma.hero.update({ 
+            where: { id: req.params.id }, 
+            data: dataToUpdate 
+        });
         res.json(updated);
-    }
-    catch (e) {
+    } catch (e) {
+        console.error(e);
         res.status(500).json({ error: "Update failed" });
     }
 });
