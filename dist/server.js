@@ -626,8 +626,8 @@ app.post('/api/hero/public-submit-update', async (req, res) => {
             // Căutăm eroi activi cu același nume (ignorăm litere mari/mici)
             const existingHero = await prisma.hero.findFirst({
                 where: {
-                    alias: { equals: alias, mode: 'insensitive' },
-                    id: { not: heroId } // excludem eroul curent în caz că și-a pus același nume pe care îl avea deja
+                    alias: alias,
+                    id: { not: heroId }
                 }
             });
             if (existingHero) {
