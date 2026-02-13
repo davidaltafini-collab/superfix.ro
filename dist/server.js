@@ -412,34 +412,37 @@ app.post('/api/heroes', authenticateToken, async (req, res) => {
         const passwordHash = await bcrypt.hash(plainPassword, 10);
         const trustFactor = rest.trustFactor || 50;
 
-        await prisma.hero.create({
+        // 1. Creăm eroul și salvăm rezultatul într-o variabilă
+        const newHero = await prisma.hero.create({
             data: { username, alias, passwordHash, email, trustFactor, missionsCompleted: 0, ...rest }
         });
 
         if (email) {
-            // Email 1
+            // Email 1: Bun venit și Credențiale
             await sendEmail(
                 email,
                 "BINE AI VENIT!",
                 "DOSAR APROBAT",
-                "Salut " + alias + ", ai fost recrutat oficial! Cu o putere mare vine și o responsabilitate mare.",
-                { "User": username, "Parola": plainPassword },
-                (process.env.FRONTEND_URL || "") + "/portal",
+                `Salut ${alias}, ai fost recrutat oficial în Liga SuperFix! Cu o putere mare vine și o responsabilitate mare.`,
+                { "Utilizator": username, "Parola": plainPassword },
+                `${process.env.FRONTEND_URL}/portal`,
                 "ACCESEAZĂ PORTALUL"
             );
 
-            // Am adăugat ?id=" + hero.id la finalul link-ului
+            // Email 2: Onboarding (Pasul 2) - ACUM CU BUTON SIGUR
+            const onboardingLink = `${process.env.FRONTEND_URL}/onboarding?id=${newHero.id}`;
+            
             await sendEmail(
                 email,
                 "PASUL 2: ACTIVAREA PROFILULUI TĂU",
                 "VEZI VIDEO DE ÎNROLARE",
-                "Salut " + alias + ", acum că ai contul creat, te rugăm să completezi datele profilului.\n\nUrmărește video-ul de înrolare aici: https://youtu.be/ID_VIDEO_AICI \n\nApasă butonul de mai jos pentru a încărca pozele și descrierea.",
+                `Salut ${alias}, acum că ai contul creat, te rugăm să completezi datele profilului.\n\nUrmărește video-ul de înrolare aici: https://youtu.be/ID_VIDEO_AICI \n\nApasă butonul de mai jos pentru a încărca pozele, video-ul și descrierea.`,
                 {
                     "Instrucțiuni": "Link-ul este personalizat, nu necesită logare.",
                     "Status": "Așteptare Date"
                 },
-                (process.env.FRONTEND_URL || "") + "/onboarding?id=" + (await prisma.hero.findUnique({ where: { username } })).id,
-                "ÎNCARCĂ DATELE PROFILULUI"
+                onboardingLink,           // <--- Link-ul butonului
+                "ÎNCARCĂ DATELE PROFILULUI" // <--- Textul butonului
             );
         }
         res.json({ success: true });
