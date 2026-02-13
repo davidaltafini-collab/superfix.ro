@@ -17,6 +17,7 @@ model Admin {
 // === EROU (Update Major) ===
 model Hero {
   id                String   @id @default(uuid())
+  slug              String?  @unique
   alias             String
   realName          String?
   username          String   @unique
@@ -100,6 +101,7 @@ model HeroApplication {
 model HeroUpdate {
   id          String   @id @default(uuid())
   heroId      String
+  alias       String?
   hero        Hero     @relation(fields: [heroId], references: [id], onDelete: Cascade)
   
   // Datele pe care vrea să le schimbe
